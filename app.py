@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from pokemon_info import POKEMON_CLASSES, POKEMON_INFO, TYPE_COLORS
 
 st.set_page_config(
-    page_title="PokéMAM — Pokédex CNN",
+    page_title="PokéDex CNN",
     page_icon="🎮",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -15,63 +15,140 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main-title { font-size: 2.6rem; font-weight: 800; text-align: center; }
-    .subtitle   { text-align: center; color: #666; margin-bottom: 1rem; }
+    /* ── Global ─────────────────────────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    .hero-title {
+        font-size: 3rem; font-weight: 800; text-align: center;
+        background: linear-gradient(135deg, #E63946 0%, #FF6B35 50%, #F72585 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text; margin-bottom: 0.2rem;
+    }
+    .hero-sub {
+        text-align: center; color: #888; font-size: 1rem;
+        margin-bottom: 0.2rem; letter-spacing: 0.03em;
+    }
+    .hero-badge {
+        display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+    .badge {
+        background: #f0f2f6; color: #444; border-radius: 20px;
+        padding: 3px 12px; font-size: 0.78rem; font-weight: 600;
+        border: 1px solid #dde1e7;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────────── */
     .pokemon-card {
-        background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf0 100%);
-        border-radius: 16px; padding: 1.5rem;
-        border: 2px solid #dde1e7; text-align: center;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 20px; padding: 1.8rem 1.5rem;
+        border: 1px solid #30304a; text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     }
+    .pokemon-card h2 { color: #fff; margin-bottom: 0.5rem; }
+    .pokemon-card h3 { margin-top: 0.8rem; }
+    .pokemon-card p  { color: #aaa; font-style: italic; margin-top: 0.6rem; }
+
     .type-badge {
-        display: inline-block; padding: 3px 12px; border-radius: 20px;
-        color: white; font-weight: 600; font-size: 0.85rem; margin: 2px;
+        display: inline-block; padding: 4px 14px; border-radius: 20px;
+        color: white; font-weight: 700; font-size: 0.82rem;
+        margin: 3px; letter-spacing: 0.04em; text-transform: uppercase;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
-    .cnn-box {
-        border: 2px solid #dde1e7; border-radius: 12px; padding: 12px 16px;
-        margin: 6px 0; text-align: center; font-size: 0.9rem;
+
+    /* ── Pokémon miniature ──────────────────────────────────────────── */
+    .poke-mini {
+        text-align: center; padding: 8px 4px; border-radius: 12px;
+        background: #f8f9fa; margin: 3px;
+        border: 1.5px solid #e8ecf0;
+        transition: border-color 0.2s;
     }
+    .poke-mini:hover { border-color: #E63946; }
+
+    /* ── Info/Warning boxes ─────────────────────────────────────────── */
     .info-box {
-        background: #f0f4ff; border-left: 4px solid #4a90d9;
-        padding: 12px 16px; border-radius: 8px; margin: 8px 0;
+        background: linear-gradient(135deg, #e8f4ff 0%, #f0f8ff 100%);
+        border-left: 4px solid #2196F3; padding: 12px 16px;
+        border-radius: 0 10px 10px 0; margin: 10px 0; font-size: 0.9rem;
+    }
+    .warn-box {
+        background: linear-gradient(135deg, #fff8e1 0%, #fffde7 100%);
+        border-left: 4px solid #FFC107; padding: 12px 16px;
+        border-radius: 0 10px 10px 0; margin: 10px 0; font-size: 0.9rem;
+    }
+
+    /* ── CNN pipeline ───────────────────────────────────────────────── */
+    .cnn-layer {
+        border-radius: 12px; padding: 10px 16px; margin: 4px 0;
+        font-size: 0.88rem; border: 1.5px solid;
+    }
+    .cnn-conv   { background: #fff0f0; border-color: #E63946; }
+    .cnn-pool   { background: #f0fff4; border-color: #2ecc71; }\n    .cnn-dense  { background: #f0f4ff; border-color: #4a90d9; }
+    .cnn-out    { background: linear-gradient(135deg, #fff0f8, #f0f4ff); border-color: #F72585; }
+    .cnn-pre    { background: #fafafa; border-color: #aaa; }
+    .cnn-arrow  { text-align: center; color: #ccc; font-size: 1.3rem; line-height: 1.2; }
+
+    /* ── Sidebar ────────────────────────────────────────────────────── */
+    .sidebar-section {
+        background: #f8f9fa; border-radius: 12px;
+        padding: 12px 14px; margin: 8px 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Sidebar ────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# SIDEBAR
+# ══════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("## 🎮 PokéMAM")
-    st.markdown("**Pokédex par CNN**")
+    st.markdown("## 🎮 PokéDex CNN")
+    st.caption("Modernisation d'un projet école en app interactive")
     st.divider()
-    st.markdown("### 📚 Projet académique")
-    st.markdown("""
-    - 🏫 **Polytech Lyon** — MAM 4A
-    - 📅 **2022 / 2023**
-    - 👥 **Équipe :**
-      - EL KHALFIOUI Nadir
-      - EL KHAMLICHI Badreddine
-      - LEHLALI Hédi
-    """)
-    st.divider()
-    st.markdown("### 🤖 Modèle")
+
+    st.markdown("**🤖 Modèle**")
     st.markdown("""
     - Architecture : **CNN custom**
     - Framework : **TensorFlow / Keras**
     - Images : **200×200 px**
-    - Entraînement : **10 epochs**
+    - Epochs : **10**
     - Classes : **10 Pokémon**
+    - Précision : **~88%**
     """)
     st.divider()
-    st.markdown("### ⚠️ Pokémon reconnus")
-    st.markdown("> Le modèle ne reconnaît **que ces 10 Pokémon**. Toute autre image donnera un résultat incorrect.")
+
+    st.markdown("**⚠️ Pokémon reconnus**")
+    st.caption("Le modèle ne reconnaît **que ces 10 Pokémon**.")
     for name in POKEMON_CLASSES:
         info = POKEMON_INFO[name]
-        st.markdown(f"{info['emoji']} `{info['numero']}` **{name}**")
+        st.markdown(f"{info['emoji']} `{info['numero']}` {name}")
 
-# ── Header ─────────────────────────────────────────────────────────────────
-st.markdown('<p class="main-title">🎮 PokéMAM — Pokédex CNN</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Reconnaissance de Pokémon par réseau de neurones convolutif · Polytech Lyon 2023</p>', unsafe_allow_html=True)
+    st.divider()
+    st.markdown("**📎 Liens**")
+    st.markdown("[📊 Dataset Kaggle](https://www.kaggle.com/datasets/vishalsubbiah/pokemon-images-and-types)")
+    st.markdown("[📓 Notebook GitHub](https://github.com/BadreddineEK/pokedexCNN/blob/main/pokemam_10_epoch.ipynb)")
 
-# ── Chargement du modèle ───────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# HERO HEADER
+# ══════════════════════════════════════════════════════════════════════════
+st.markdown('<p class="hero-title">🎮 PokéDex CNN</p>', unsafe_allow_html=True)
+st.markdown(
+    '<p class="hero-sub">Reconnaissance de Pokémon par réseau de neurones convolutif</p>',
+    unsafe_allow_html=True,
+)
+st.markdown("""
+<div class="hero-badge">
+  <span class="badge">🏫 Polytech Lyon • 2022‣2023</span>
+  <span class="badge">🔁 Repris &amp; modernizé</span>
+  <span class="badge">🤖 TensorFlow / Keras</span>
+  <span class="badge">🎯 10 classes • ~88%</span>
+  <span class="badge">✨ Streamlit Cloud</span>
+</div>
+""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════
+# CHARGEMENT DU MODÈLE
+# ══════════════════════════════════════════════════════════════════════════
 MODEL_PATH = "pokemon_cnn_model.keras"
 
 @st.cache_resource(show_spinner="⏳ Chargement du modèle CNN...")
@@ -88,323 +165,323 @@ if os.path.exists(MODEL_PATH):
 else:
     st.warning(f"⚠️ Modèle introuvable (`{MODEL_PATH}`). Entraînez et sauvegardez le modèle depuis le notebook.")
 
-# ── Onglets ────────────────────────────────────────────────────────────────
-tab_pred, tab_cnn, tab_about = st.tabs(["🔍 Prédiction", "🧠 Architecture CNN", "📊 À propos du dataset"])
+# ══════════════════════════════════════════════════════════════════════════
+# ONGLETS
+# ══════════════════════════════════════════════════════════════════════════
+tab_pred, tab_cnn, tab_about = st.tabs([
+    "🔍 Identifier un Pokémon",
+    "🧠 Architecture CNN",
+    "📊 Dataset & Projet",
+])
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────
 # TAB 1 : PRÉDICTION
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────
 with tab_pred:
-    st.markdown("### 📤 Identifier un Pokémon")
-
     st.markdown("""
-    <div class="info-box">
-    ⚠️ <strong>Important :</strong> ce modèle a été entraîné <strong>uniquement sur 10 Pokémon</strong>
-    (voir la barre latérale). Uploadez une image de l'un de ces 10 Pokémon pour obtenir un résultat fiable.
+    <div class="warn-box">
+    ⚠️ <strong>Scope du modèle :</strong> entraîné sur <strong>10 Pokémon seulement</strong>.
+    Uploadez l’image de l’un d’eux pour un résultat fiable (voir liste en sidebar).
     </div>
     """, unsafe_allow_html=True)
 
     col_upload, col_result = st.columns([1, 2], gap="large")
 
     with col_upload:
+        st.markdown("#### 📤 Uploader une image")
         uploaded = st.file_uploader(
-            "Déposez l'image d'un Pokémon",
+            "Formats acceptés : JPG, PNG, WEBP",
             type=["jpg", "jpeg", "png", "webp"],
-            help="Formats acceptés : JPG, PNG, WEBP",
+            label_visibility="collapsed",
         )
         if uploaded:
             img_pil = Image.open(uploaded).convert("RGB")
-            st.image(img_pil, caption="Image chargée", use_container_width=True)
-
+            st.image(img_pil, use_container_width=True)
             if model is not None:
-                if st.button("🔍 Identifier le Pokémon", type="primary", use_container_width=True):
-                    img_resized = img_pil.resize((200, 200))
-                    img_array  = np.array(img_resized).astype("float32")
-                    img_input  = np.expand_dims(img_array, axis=0)
+                if st.button("🔍 Identifier", type="primary", use_container_width=True):
+                    arr = np.expand_dims(
+                        np.array(img_pil.resize((200, 200))).astype("float32"), 0
+                    )
                     with st.spinner("Analyse en cours..."):
-                        predictions = model.predict(img_input)[0]
-                    st.session_state["predictions"] = predictions
+                        preds = model.predict(arr)[0]
+                    st.session_state["predictions"] = preds
             else:
-                st.info("ℹ️ Modèle non chargé — prédictions désactivées.")
+                st.info("ℹ️ Modèle non chargé.")
 
-        # Galerie des 10 Pokémon supportés
         st.divider()
-        st.markdown("**Pokémon supportés :**")
+        st.markdown("**Pokémon supportés**")
         cols5 = st.columns(5)
         for i, name in enumerate(POKEMON_CLASSES):
             info = POKEMON_INFO[name]
             with cols5[i % 5]:
                 st.markdown(
-                    f'<div style="text-align:center;padding:6px;border-radius:8px;'
-                    f'background:#f8f9fa;margin:3px;border:1px solid #e0e0e0">'
-                    f'<div style="font-size:1.6rem">{info["emoji"]}</div>'
-                    f'<small><b>{name}</b></small><br>'
-                    f'<small style="color:#888">{info["numero"]}</small></div>',
+                    f'<div class="poke-mini">'
+                    f'<div style="font-size:1.5rem">{info["emoji"]}</div>'
+                    f'<div style="font-size:0.72rem;font-weight:600">{name}</div>'
+                    f'<div style="font-size:0.65rem;color:#999">{info["numero"]}</div></div>',
                     unsafe_allow_html=True,
                 )
 
     with col_result:
-        st.markdown("### 📊 Résultat")
+        st.markdown("#### 📊 Résultat de la prédiction")
 
         if "predictions" in st.session_state:
-            predictions = st.session_state["predictions"]
-            top_idx  = int(np.argmax(predictions))
+            preds    = st.session_state["predictions"]
+            top_idx  = int(np.argmax(preds))
             top_name = POKEMON_CLASSES[top_idx]
-            top_conf = predictions[top_idx] * 100
+            top_conf = preds[top_idx] * 100
             info     = POKEMON_INFO[top_name]
+
+            confidence_color = (
+                "#2ecc71" if top_conf >= 80 else
+                "#FFC107" if top_conf >= 50 else "#E63946"
+            )
 
             types_html = "".join(
                 f'<span class="type-badge" style="background:{TYPE_COLORS.get(t, "#888")}">{t}</span>'
                 for t in info["types"]
             )
-            legendary_badge = "⭐ Légendaire" if info["legendaire"] else ""
+            legendary = "⭐ Légendaire" if info["legendaire"] else ""
+
             st.markdown(f"""
             <div class="pokemon-card">
-                <h2>{info["emoji"]} {top_name} {info["numero"]}</h2>
+                <div style="font-size:3.5rem">{info['emoji']}</div>
+                <h2>{top_name} <span style="color:#888;font-size:1rem">{info['numero']}</span></h2>
                 <div>{types_html}</div>
-                <h3 style="color:#2196F3">Confiance : {top_conf:.1f}%</h3>
-                <p style="color:#555; font-style:italic">{info["description"]}</p>
-                <p>{legendary_badge}</p>
+                <h3 style="color:{confidence_color};margin-top:1rem">
+                    Confiance : {top_conf:.1f}%
+                </h3>
+                <p>{info['description']}</p>
+                <p style="color:#f1c40f;font-size:0.9rem">{legendary}</p>
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("📈 Statistiques de base", expanded=True):
+            st.markdown("")
+
+            with st.expander("📊 Stats de base", expanded=True):
                 stats = {
                     "HP": info["hp"], "ATK": info["atk"], "DEF": info["def"],
                     "Sp.ATK": info["spa"], "Sp.DEF": info["spd"], "Speed": info["spe"],
                 }
+                total = sum(stats.values())
+                st.caption(f"Total : **{total}**")
                 for stat_name, val in stats.items():
                     c1, c2 = st.columns([1, 3])
                     c1.markdown(f"**{stat_name}**")
                     c2.progress(min(val / 160, 1.0), text=str(val))
 
-            st.markdown("### 🎯 Distribution des probabilités")
-            probs_pct = [p * 100 for p in predictions]
+            st.markdown("#### 🎯 Distribution softmax")
+            probs_pct = [p * 100 for p in preds]
             colors    = [TYPE_COLORS.get(POKEMON_INFO[n]["types"][0], "#888") for n in POKEMON_CLASSES]
             fig = go.Figure(go.Bar(
-                x=POKEMON_CLASSES, y=probs_pct,
-                marker_color=colors, marker_line_color="white", marker_line_width=1.5,
+                x=POKEMON_CLASSES, y=probs_pct, marker_color=colors,
+                marker_line_color="rgba(255,255,255,0.3)", marker_line_width=1,
                 text=[f"{p:.1f}%" for p in probs_pct], textposition="outside",
             ))
             fig.update_layout(
-                title="Probabilités par classe (softmax)",
                 xaxis_title="Pokémon", yaxis_title="Probabilité (%)",
-                yaxis_range=[0, 115],
+                yaxis_range=[0, 118],
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(size=12), showlegend=False, height=380,
-                margin=dict(t=50, b=10),
+                font=dict(family="Inter, sans-serif", size=11),
+                showlegend=False, height=360,
+                margin=dict(t=10, b=10, l=0, r=0),
             )
-            fig.update_xaxes(tickangle=-30)
+            fig.update_xaxes(tickangle=-35)
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("👈 Chargez une image et cliquez sur **Identifier le Pokémon** pour commencer.")
+            st.markdown("""
+            <div style="text-align:center;padding:3rem 1rem;color:#aaa">
+                <div style="font-size:4rem">👀</div>
+                <p>Uploadez une image et cliquez sur <strong>Identifier</strong></p>
+            </div>
+            """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────
 # TAB 2 : ARCHITECTURE CNN
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────
 with tab_cnn:
-    st.markdown("## 🧠 Architecture du réseau de neurones convolutif (CNN)")
-
+    st.markdown("## 🧠 Architecture du réseau de neurones convolutif")
     st.markdown("""
-    Un **CNN (Convolutional Neural Network)** est un réseau de neurones spécialement conçu pour
-    traiter des images. Il apprend automatiquement à reconnaître des motifs visuels (bords, formes,
-    textures) à partir des données d'entraînement, sans qu'on ait besoin de définir manuellement
-    les caractéristiques.
+    Un **CNN (Convolutional Neural Network)** apprend automatiquement à extraire des caractéristiques
+    visuelles hiérarchiques depuis une image — bords et couleurs dans les premières couches,
+    formes complexes et silhouettes dans les dernières — sans qu’on ait besoin de les définir manuellement.
     """)
 
-    # Pipeline visuel
-    st.markdown("### 🔄 Pipeline complet")
-    steps = [
-        ("📷", "Image brute (variable)",        "Sprites PNG des Pokémon"),
-        ("🔧", "Prétraitement",                  "Redimensionnement 200×200 px · Data augmentation\n(rotation, zoom, flip) pour générer ×30 images/Pokémon"),
-        ("📂", "Split train/val/test",            "70% entraînement · 20% test · 10% validation\n(généré depuis le sprite avec augmentation)"),
-        ("🧱", "Conv2D 128 filtres (4×4) + ReLU", "Détection de motifs locaux bas niveau (bords, couleurs)"),
-        ("⬇️", "MaxPooling2D",                    "Réduction spatiale × 2 → compression de l'info"),
-        ("🧱", "Conv2D 64 filtres (4×4) + ReLU",  "Motifs de niveau intermédiaire (formes, textures)"),
-        ("⬇️", "MaxPooling2D",                    "Réduction spatiale × 2"),
-        ("🧱", "Conv2D 32 filtres (4×4) + ReLU",  "Motifs complexes (parties du corps, silhouettes)"),
-        ("⬇️", "MaxPooling2D",                    "Réduction spatiale × 2"),
-        ("🧱", "Conv2D 16 filtres (4×4) + ReLU",  "Caractéristiques de haut niveau"),
-        ("⬇️", "MaxPooling2D",                    "Réduction spatiale × 2"),
-        ("📐", "Flatten",                         "Vecteur 1D à partir de la carte 3D"),
-        ("🔗", "Dense 64 + ReLU",                 "Couche entièrement connectée — combine les features"),
-        ("🎯", "Dense 10 + Softmax",              "Sortie : 10 probabilités (une par Pokémon)"),
-    ]
-    for icon, name, desc in steps:
-        col_i, col_c = st.columns([1, 5])
-        col_i.markdown(f"<div style='font-size:2rem;text-align:center'>{icon}</div>", unsafe_allow_html=True)
-        col_c.markdown(f"<div class='cnn-box'><strong>{name}</strong><br><small style='color:#555'>{desc}</small></div>", unsafe_allow_html=True)
-        if icon in ("🔧", "📂"):
-            st.markdown("")
-        elif "MaxPooling" not in name and "Dense 10" not in name:
-            st.markdown("<div style='text-align:center;font-size:1.2rem;color:#aaa'>↓</div>", unsafe_allow_html=True)
+    col_pipeline, col_params = st.columns([3, 2], gap="large")
 
-    st.divider()
+    with col_pipeline:
+        st.markdown("### 🔄 Pipeline")
 
-    # Hyperparamètres
-    col_a, col_b, col_c = st.columns(3)
-    with col_a:
+        layers = [
+            ("cnn-pre",  "📷 Image brute",                    "Sprite PNG du Pokémon (taille variable)"),
+            ("cnn-pre",  "🔧 Prétraitement + Data augmentation", "Redim. 200×200 · Rotation ±20° · Zoom ±15% · Flip · Luminosité ·15%"),
+            ("cnn-pre",  "📂 Split 70/20/10",                  "Train 70% · Test 20% · Validation 10%"),
+            None,  # séparateur visuel
+            ("cnn-conv", "🧱 Conv2D • 128 filtres 4×4 • ReLU",  "Détection motifs bas niveau : bords, couleurs, gradients"),
+            ("cnn-pool", "↓ MaxPooling2D",                       "Réduction spatiale ×2 — conserve les réponses max"),
+            ("cnn-conv", "🧱 Conv2D • 64 filtres 4×4 • ReLU",   "Motifs intermédiaires : formes, textures"),
+            ("cnn-pool", "↓ MaxPooling2D",                       "Réduction spatiale ×2"),
+            ("cnn-conv", "🧱 Conv2D • 32 filtres 4×4 • ReLU",   "Motifs complexes : parties du corps, silhouettes"),
+            ("cnn-pool", "↓ MaxPooling2D",                       "Réduction spatiale ×2"),
+            ("cnn-conv", "🧱 Conv2D • 16 filtres 4×4 • ReLU",   "Caractéristiques de haut niveau"),
+            ("cnn-pool", "↓ MaxPooling2D",                       "Réduction spatiale ×2"),
+            None,
+            ("cnn-dense", "📏 Flatten",                          "Carte 3D → vecteur 1D"),
+            ("cnn-dense", "🔗 Dense 64 • ReLU",                  "Couche fully-connected — combine toutes les features"),
+            ("cnn-out",   "🎯 Dense 10 • Softmax",               "10 probabilités de sortie — une par Pokémon"),
+        ]
+
+        for layer in layers:
+            if layer is None:
+                st.markdown("<div class='cnn-arrow'>⋮</div>", unsafe_allow_html=True)
+            else:
+                cls, name, desc = layer
+                st.markdown(
+                    f"<div class='cnn-layer {cls}'>"
+                    f"<strong>{name}</strong>"
+                    f"<br><span style='color:#666;font-size:0.82rem'>{desc}</span>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+
+    with col_params:
         st.markdown("### ⚙️ Hyperparamètres")
         st.markdown("""
         | Paramètre | Valeur |
-        |-----------|--------|
-        | Image size | 200 × 200 px |
+        |---|---|
+        | Taille image | 200×200 px |
         | Batch size | 32 |
         | Epochs | 10 |
-        | Optimiseur | Adam |
-        | Loss | SparseCategoricalCrossentropy |
-        | Activation finale | Softmax |
+        | Optimiseur | **Adam** |
+        | Loss | SparseCategorical CE |
+        | Activation sortie | **Softmax** |
         """)
-    with col_b:
-        st.markdown("### 📊 Data augmentation")
+
+        st.markdown("### 📈 Entraînement")
         st.markdown("""
-        Comme chaque Pokémon n'a **qu'un seul sprite** de base, on génère **30 variantes** d'entraînement
-        par Pokémon par augmentation :
+        Avec un seul sprite par Pokémon, la **data augmentation** est cruciale :
+        chaque image est transformée pour générer **30 variantes** d'entraînement.
 
-        - Rotation ±20°
-        - Zoom ±15%
-        - Décalage H/V ±10%
-        - Flip horizontal
-        - Variation de luminosité ±15%
+        Résultats obtenus en **~10 epochs** :
+        - Précision validation : **~88%**
+        - Taille modèle : **~3 MB**
         """)
-    with col_c:
-        st.markdown("### 🎯 Résultat")
+
+        st.markdown("### 🔬 Pourquoi ces choix ?")
         st.markdown("""
-        Le modèle entraîné est sauvegardé en `.keras` (TensorFlow 2.x).
-
-        - **Classes** : 10 Pokémon
-        - **Précision** : ~88%
-        - **Taille du modèle** : ~3 MB
-
-        La prédiction finale est l'index du **score softmax le plus élevé**,
-        converti en nom de classe via `POKEMON_CLASSES`.
+        - **Filtres décroissants (128→64→32→16)** : les premières couches détectent
+          beaucoup de motifs bas-niveau, les suivantes affinent.
+        - **4 blocs Conv+Pool** suffisent pour des sprites simples
+          (fond blanc, formes distinctives).
+        - **Adam** converge vite même avec peu de données.
+        - **Softmax** produit des probabilités interprétables pour 10 classes.
         """)
 
-    st.divider()
-    st.markdown("### 🔬 Pourquoi ces choix d'architecture ?")
-    st.markdown("""
-    - **4 blocs Conv+Pool** : suffisant pour des sprites 200×200 relativement simples (fond blanc, formes distinctes).
-      Plus de couches augmenteraient le temps d'entraînement sans gain notable sur si peu de données.
-    - **Filtres décroissants (128→64→32→16)** : les premières couches détectent beaucoup de motifs bas-niveau,
-      les suivantes affinent en réduisant la dimensionnalité.
-    - **Softmax + SparseCategoricalCrossentropy** : idéal pour la classification multi-classes avec labels entiers.
-    - **Adam** : optimiseur adaptatif, converge rapidement même avec peu de données.
-    """)
-
-# ═══════════════════════════════════════════════════════════════════════════
-# TAB 3 : À PROPOS DU DATASET
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────
+# TAB 3 : DATASET & PROJET
+# ─────────────────────────────────────────────────────────────────────────
 with tab_about:
-    st.markdown("## 📊 À propos du dataset et du projet")
+    st.markdown("## 📊 Dataset & Projet")
 
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        st.markdown("### 🗂️ Dataset utilisé (version actuelle)")
+        st.markdown("### 📖 Contexte")
         st.markdown("""
-        **Source :** sprites PNG officieux, un fichier par Pokémon.
+        Ce projet a été réalisé en **4ème année à Polytech Lyon** (2022–2023)
+        dans le cadre d’un cours de machine learning appliqué.
 
-        - **Format** : 1 sprite PNG par Pokémon (fond transparent/blanc)
-        - **~900 Pokémon** disponibles dans `/images/`
-        - **10 sélectionnés** pour l'entraînement (voir ci-dessous)
-        - Images redimensionnées à **200×200 px** avant entraînement
-        - Data augmentation × 30 par Pokémon → **300 images d'entraînement**
+        L’objectif original était de démontrer le pipeline complet d’un CNN —
+        prétraitement, augmentation, entraînement, évaluation — sur un jeu de
+        données visuel concret.
 
-        **Pourquoi 10 seulement ?**
-        Avec un seul sprite de base par Pokémon, même avec augmentation, entraîner
-        sur 900 classes (~27 000 images) prendrait plusieurs heures et nécessiterait
-        un GPU. 10 classes permettent de démontrer le pipeline complet rapidement.
+        Cette version est une **reprise et modernisation** du projet original :
+        le modèle est inchangé, mais l’interface a été entièrement reconstruite
+        en Streamlit avec une expérience utilisateur améliorée et déployée
+        sur **Streamlit Cloud**.
         """)
 
-        st.markdown("### ⚠️ Les 10 Pokémon retenus")
-        st.markdown("> Choisis pour leur **diversité visuelle** et leur popularité.")
+        st.markdown("### 🗂️ Dataset")
+        st.markdown("""
+        **Source :** [Pokemon Images and Types](https://www.kaggle.com/datasets/vishalsubbiah/pokemon-images-and-types)
+        sur Kaggle — licence CC0.
+
+        - **809 Pokémon** (générations 1 à 7)
+        - **1 sprite PNG** par Pokémon (fond transparent)
+        - **CSV** avec types et métadonnées
+
+        Pour ce projet, **10 Pokémon** ont été sélectionnés pour leur
+        diversité visuelle (couleurs, silhouettes, types distincts).
+        Chaque sprite génère **30 images augmentées** → 300 images d’entraînement.
+        """)
+        st.link_button("📥 Dataset Kaggle", "https://www.kaggle.com/datasets/vishalsubbiah/pokemon-images-and-types")
+
+        st.markdown("### ⚙️ 10 Pokémon sélectionnés")
         for i, name in enumerate(POKEMON_CLASSES):
             info = POKEMON_INFO[name]
-            types_str = " · ".join(
+            types_html = "".join(
                 f'<span style="background:{TYPE_COLORS.get(t,"#888")};color:white;'
-                f'padding:1px 7px;border-radius:10px;font-size:0.8rem">{t}</span>'
-                for t in info["types"]
+                f'padding:1px 8px;border-radius:10px;font-size:0.78rem;margin:2px">'
+                f'{t}</span>' for t in info["types"]
             )
             st.markdown(
-                f"**{i}.** {info['emoji']} **{name}** `{info['numero']}`  &nbsp; {types_str}",
+                f"**{i+1}.** {info['emoji']} **{name}** `{info['numero']}` &nbsp; {types_html}",
                 unsafe_allow_html=True,
             )
 
     with col2:
-        st.markdown("### 🚀 Pour aller plus loin — Dataset Kaggle")
+        st.markdown("### 🚀 Étendre le modèle")
         st.markdown("""
-        Pour entraîner sur **plus de Pokémon** ou avec **plus d'images** par classe,
-        utilisez le dataset officiel Kaggle :
-
-        > **[Pokemon Images and Types](https://www.kaggle.com/datasets/vishalsubbiah/pokemon-images-and-types)**
-        > par *vishalsubbiah* sur Kaggle
-
-        Ce dataset contient :
-        - **809 Pokémon** (générations 1 à 7)
-        - **1 image PNG** par Pokémon (sprites haute qualité)
-        - **Un CSV** avec le type de chaque Pokémon
-        - Licence : CC0 (domaine public)
-        """)
-
-        st.link_button(
-            "📥 Télécharger sur Kaggle",
-            "https://www.kaggle.com/datasets/vishalsubbiah/pokemon-images-and-types",
-        )
-
-        st.markdown("### 📈 Comment étendre le modèle ?")
-        st.markdown("""
-        Dans le notebook `pokemam_10_epoch.ipynb`, modifiez simplement :
+        Pour entraîner sur d’autres Pokémon ou plus de classes, ouvrez
+        `pokemam_10_epoch.ipynb` et modifiez :
 
         ```python
-        # Cellule 10 — changer les 10 Pokémon
-        SELECTED_POKEMON = [
-            'pikachu', 'charizard', 'mewtwo', 'gengar', 'eevee',
-            'lucario', 'gardevoir', 'gyarados', 'snorlax', 'blastoise',
-            # Ajouter autant que voulu...
+        # Changer la liste des Pokémon
+        SELECTED = [
+            'pikachu', 'charizard', 'mewtwo',
+            'gengar', 'eevee', 'lucario', ...
         ]
+        # Augmenter les données
+        N_AUGMENTED = 50    # images par Pokémon
+        EPOCHS = 20
         ```
-
-        Et ajustez les hyperparamètres :
-
-        ```python
-        N_TRAIN = 50    # plus d'images augmentées
-        epochs  = 20   # plus d'epochs
-        ```
-
-        Puis re-sauvegardez le modèle :
+        Puis sauvegarder :
         ```python
         model.save('pokemon_cnn_model.keras')
         ```
         """)
 
-        st.divider()
-        st.markdown("### 🗂️ Structure du dépôt Git")
-        st.markdown("""
-        ```
-        pokedexCNN/
-        ├── app.py                     # App Streamlit (ce fichier)
-        ├── pokemon_info.py            # Métadonnées des 10 Pokémon
-        ├── pokemon_cnn_model.keras    # Modèle entraîné (~3 MB)
-        ├── pokemon.csv                # Données Pokémon (types, évolutions)
-        ├── pokemam_10_epoch.ipynb     # Notebook d'entraînement
-        ├── requirements.txt
-        ├── .gitignore
-        │
-        ├── images/        🚫 gitignore — sprites bruts (~900 PNG)
-        ├── train/         🚫 gitignore — images augmentées
-        ├── val/           🚫 gitignore — images augmentées
-        ├── test/          🚫 gitignore — images augmentées
-        └── dataset/       🚫 gitignore — données brutes
-        ```
-        > Les dossiers `images/`, `train/`, `val/`, `test/` sont exclus du git.
-        > Ils se régénèrent en exécutant le notebook.
-        """)
+        st.markdown("### 🗂️ Structure du repo")
+        st.code("""
+pokedexCNN/
+├── app.py                    # App Streamlit
+├── pokemon_info.py           # Méta-données des 10 Pokémon
+├── pokemon_cnn_model.keras   # Modèle entraîné (~3 MB)
+├── pokemon.csv               # Stats complètes (809 Pokémon)
+├── pokemam_10_epoch.ipynb    # Notebook d'entraînement
+├── requirements.txt
+├── .streamlit/config.toml
+│
+├── images/   🚫 gitignore
+├── train/    🚫 gitignore
+├── val/      🚫 gitignore
+└── test/     🚫 gitignore
+        """, language="")
 
+        st.markdown("### 🔗 Liens utiles")
+        st.link_button("📓 Voir le notebook", "https://github.com/BadreddineEK/pokedexCNN/blob/main/pokemam_10_epoch.ipynb")
+        st.link_button("⭐ GitHub du projet", "https://github.com/BadreddineEK/pokedexCNN")
+
+# ══════════════════════════════════════════════════════════════════════════
+# FOOTER
+# ══════════════════════════════════════════════════════════════════════════
 st.divider()
 st.markdown(
-    "<p style='text-align:center; color:#aaa; font-size:0.85rem'>"
-    "Made with ❤️ and a lot of Pokéballs · Polytech Lyon 2023 · "
-    "<a href='https://www.kaggle.com/datasets/vishalsubbiah/pokemon-images-and-types' "
-    "style='color:#aaa'>Dataset Kaggle</a></p>",
+    "<p style='text-align:center;color:#bbb;font-size:0.82rem'>"
+    "Projet école Polytech Lyon 2022–2023 — repris &amp; modernizé · "
+    "<a href='https://github.com/BadreddineEK/pokedexCNN' style='color:#bbb'>"
+    "GitHub</a> · "
+    "<a href='https://www.kaggle.com/datasets/vishalsubbiah/pokemon-images-and-types' style='color:#bbb'>"
+    "Dataset Kaggle</a></p>",
     unsafe_allow_html=True,
 )
