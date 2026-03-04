@@ -1,0 +1,23 @@
+# Modèle entraîné (trop lourd pour Git, hébergé sur Google Drive)
+model.keras
+*.h5
+
+# Secrets locaux (ne jamais commiter)
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dataset (trop lourd)
+dataset/
+train/
+val/
+test/

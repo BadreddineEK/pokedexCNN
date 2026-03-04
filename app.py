@@ -25,7 +25,6 @@ st.markdown("""
         border: 2px solid #dde1e7;
         text-align: center;
     }
-    .stat-bar { margin: 4px 0; }
     .type-badge {
         display: inline-block;
         padding: 3px 12px;
@@ -63,7 +62,7 @@ with st.sidebar:
     """)
     st.divider()
     st.markdown("### 🐾 Pokémon reconnus")
-    for i, name in enumerate(POKEMON_CLASSES):
+    for name in POKEMON_CLASSES:
         info = POKEMON_INFO[name]
         st.markdown(f"{info['emoji']} `{info['numero']}` {name}")
 
@@ -72,30 +71,56 @@ st.markdown('<p class="main-title">🎮 PokéMAM — Pokédex CNN</p>', unsafe_a
 st.markdown('<p class="subtitle">Reconnaissance de Pokémon par réseau de neurones convolutif · Polytech Lyon 2023</p>', unsafe_allow_html=True)
 
 # ── Chargement du modèle ──────────────────────────────────────────────────────
+# Le modèle est téléchargé depuis Google Drive au premier démarrage
+# → Remplacez GDRIVE_FILE_ID par l'ID de votre fichier model.keras partagé
+GDRIVE_FILE_ID = st.secrets.get("GDRIVE_FILE_ID", "")
 MODEL_PATH = "model.keras"
 
-@st.cache_resource
-def load_model():
+@st.cache_resource(show_spinner="⏳ Téléchargement du modèle...")
+def load_model(gdrive_id: str):
     import tensorflow as tf
-    return tf.keras.models.load_model(MODEL_PATH)
+    if not os.path.exists(MODEL_PATH):
+        try:
+            import gdown
+            url = f"https://drive.google.com/uc?id={gdrive_id}"
+            gdown.download(url, MODEL_PATH, quiet=False)
+        except Exception as e:
+            return None, f"Erreur téléchargement : {e}"
+    try:
+        model = tf.keras.models.load_model(MODEL_PATH)
+        return model, None
+    except Exception as e:
+        return None, f"Erreur chargement : {e}"
 
 model = None
-if os.path.exists(MODEL_PATH):
-    try:
-        model = load_model()
-        st.success("✅ Modèle chargé avec succès !")
-    except Exception as e:
-        st.error(f"❌ Erreur lors du chargement du modèle : {e}")
-else:
+if not GDRIVE_FILE_ID:
     st.warning("""
-    ⚠️ **Modèle non trouvé**
+    ⚠️ **Modèle non configuré**
 
-    Pour utiliser l'application, entraînez d'abord le modèle via le notebook `pokemam_10_epoch.ipynb`
-    puis sauvegardez-le à la racine du projet avec :
-    ```python
-    model.save('model.keras')
+    Pour activer les prédictions, deux options :
+
+    **Option A — Streamlit Cloud :** ajoutez votre secret dans `.streamlit/secrets.toml` :
+    ```toml
+    GDRIVE_FILE_ID = "votre_id_google_drive"
     ```
+    Puis partagez `model.keras` en accès public sur Google Drive.
+
+    **Option B — En local :** placez `model.keras` à la racine et relancez l'app.
     """)
+elif os.path.exists(MODEL_PATH):
+    # Fichier déjà présent localement (ex: run local)
+    import tensorflow as tf
+    try:
+        model = tf.keras.models.load_model(MODEL_PATH)
+        st.success("✅ Modèle chargé !")
+    except Exception as e:
+        st.error(f"❌ {e}")
+else:
+    model, err = load_model(GDRIVE_FILE_ID)
+    if err:
+        st.error(f"❌ {err}")
+    else:
+        st.success("✅ Modèle chargé !")
 
 st.divider()
 
@@ -114,19 +139,16 @@ with col_upload:
         img_pil = Image.open(uploaded).convert("RGB")
         st.image(img_pil, caption="Image chargée", use_container_width=True)
 
-        if model is not None and st.button("🔍 Identifier le Pokémon", type="primary", use_container_width=True):
-            # Prétraitement identique à l'entraînement
-            img_resized = img_pil.resize((200, 200))
-            img_array = np.array(img_resized) / 255.0
-            img_input = np.expand_dims(img_array, axis=0)
-
-            with st.spinner("Analyse en cours..."):
-                predictions = model.predict(img_input)[0]
-
-            st.session_state["predictions"] = predictions
-            st.session_state["image"] = img_pil
-        elif model is None:
-            st.info("ℹ️ Chargez un modèle entraîné pour effectuer une prédiction.")
+        if model is not None:
+            if st.button("🔍 Identifier le Pokémon", type="primary", use_container_width=True):
+                img_resized = img_pil.resize((200, 200))
+                img_array = np.array(img_resized) / 255.0
+                img_input = np.expand_dims(img_array, axis=0)
+                with st.spinner("Analyse en cours..."):
+                    predictions = model.predict(img_input)[0]
+                st.session_state["predictions"] = predictions
+        else:
+            st.info("ℹ️ Configurez le modèle (voir avertissement ci-dessus) pour activer les prédictions.")
 
 with col_result:
     st.markdown("### 📊 Résultat")
@@ -138,7 +160,6 @@ with col_result:
         top_conf = predictions[top_idx] * 100
         info = POKEMON_INFO[top_name]
 
-        # Carte du Pokémon prédit
         types_html = "".join(
             f'<span class="type-badge" style="background:{TYPE_COLORS.get(t, "#888")}">{t}</span>'
             for t in info["types"]
@@ -154,22 +175,19 @@ with col_result:
 
         st.markdown("")
 
-        # Stats du Pokémon
         with st.expander("📈 Statistiques de base", expanded=True):
-            stats = {"HP": info["hp"], "ATK": info["atk"], "DEF": info["def"],
-                     "ATK Spé": info["spa"], "DEF Spé": info["spd"], "Vitesse": info["spe"]}
+            stats = {
+                "HP": info["hp"], "ATK": info["atk"], "DEF": info["def"],
+                "ATK Spé": info["spa"], "DEF Spé": info["spd"], "Vitesse": info["spe"]
+            }
             for stat_name, val in stats.items():
-                cols = st.columns([1, 3])
-                cols[0].markdown(f"**{stat_name}**")
-                cols[1].progress(min(val / 160, 1.0), text=str(val))
+                c1, c2 = st.columns([1, 3])
+                c1.markdown(f"**{stat_name}**")
+                c2.progress(min(val / 160, 1.0), text=str(val))
 
-        # Graphique des probabilités
         st.markdown("### 🎯 Distribution des probabilités")
         probs_pct = [p * 100 for p in predictions]
-        colors = []
-        for name in POKEMON_CLASSES:
-            first_type = POKEMON_INFO[name]["types"][0]
-            colors.append(TYPE_COLORS.get(first_type, "#888888"))
+        colors = [TYPE_COLORS.get(POKEMON_INFO[n]["types"][0], "#888") for n in POKEMON_CLASSES]
 
         fig = go.Figure(go.Bar(
             x=POKEMON_CLASSES,
@@ -184,7 +202,7 @@ with col_result:
             title="Probabilités par classe (softmax)",
             xaxis_title="Pokémon",
             yaxis_title="Probabilité (%)",
-            yaxis_range=[0, 110],
+            yaxis_range=[0, 115],
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
             font=dict(size=12),
@@ -197,8 +215,6 @@ with col_result:
 
     else:
         st.info("👈 Chargez une image et cliquez sur **Identifier le Pokémon** pour commencer.")
-
-        # Galerie des Pokémon reconnus
         st.markdown("### 🐾 Pokémon reconnus par le modèle")
         cols = st.columns(5)
         for i, name in enumerate(POKEMON_CLASSES):
