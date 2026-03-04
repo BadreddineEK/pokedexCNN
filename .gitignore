@@ -12,11 +12,16 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 
-# Dataset (trop lourd)
+# Dataset & images brutes (trop lourds, se régénèrent depuis le notebook)
+dataset
 dataset/
+images/
 train/
 val/
 test/
+
+# Modèle .h5 (doublon de .keras)
+*.h5
 
 # NOTE : model.keras est versionné dans ce repo (< 100 MB)
 # S'il dépasse 100 MB, utiliser Git LFS :
