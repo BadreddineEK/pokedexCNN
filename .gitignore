@@ -1,7 +1,3 @@
-# Modèle entraîné (trop lourd pour Git, hébergé sur Google Drive)
-model.keras
-*.h5
-
 # Secrets locaux (ne jamais commiter)
 .streamlit/secrets.toml
 
@@ -21,3 +17,7 @@ dataset/
 train/
 val/
 test/
+
+# NOTE : model.keras est versionné dans ce repo (< 100 MB)
+# S'il dépasse 100 MB, utiliser Git LFS :
+#   git lfs track "*.keras"

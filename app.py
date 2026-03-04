@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 
 from pokemon_info import POKEMON_CLASSES, POKEMON_INFO, TYPE_COLORS
 
-# ── Configuration de la page ──────────────────────────────────────────────────
 st.set_page_config(
     page_title="PokéMAM — Pokédex CNN",
     page_icon="🎮",
@@ -14,7 +13,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── CSS custom ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     .main-title { font-size: 2.8rem; font-weight: 800; text-align: center; }
@@ -37,7 +35,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
+# ── Sidebar ────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🎮 PokéMAM")
     st.markdown("**Pokédex par CNN**")
@@ -66,65 +64,39 @@ with st.sidebar:
         info = POKEMON_INFO[name]
         st.markdown(f"{info['emoji']} `{info['numero']}` {name}")
 
-# ── En-tête principal ─────────────────────────────────────────────────────────
+# ── Header ───────────────────────────────────────────────────────────────────
 st.markdown('<p class="main-title">🎮 PokéMAM — Pokédex CNN</p>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Reconnaissance de Pokémon par réseau de neurones convolutif · Polytech Lyon 2023</p>', unsafe_allow_html=True)
 
 # ── Chargement du modèle ──────────────────────────────────────────────────────
-# Le modèle est téléchargé depuis Google Drive au premier démarrage
-# → Remplacez GDRIVE_FILE_ID par l'ID de votre fichier model.keras partagé
-GDRIVE_FILE_ID = st.secrets.get("GDRIVE_FILE_ID", "")
 MODEL_PATH = "model.keras"
 
-@st.cache_resource(show_spinner="⏳ Téléchargement du modèle...")
-def load_model(gdrive_id: str):
+@st.cache_resource(show_spinner="⏳ Chargement du modèle CNN...")
+def load_model():
     import tensorflow as tf
-    if not os.path.exists(MODEL_PATH):
-        try:
-            import gdown
-            url = f"https://drive.google.com/uc?id={gdrive_id}"
-            gdown.download(url, MODEL_PATH, quiet=False)
-        except Exception as e:
-            return None, f"Erreur téléchargement : {e}"
-    try:
-        model = tf.keras.models.load_model(MODEL_PATH)
-        return model, None
-    except Exception as e:
-        return None, f"Erreur chargement : {e}"
+    return tf.keras.models.load_model(MODEL_PATH)
 
 model = None
-if not GDRIVE_FILE_ID:
-    st.warning("""
-    ⚠️ **Modèle non configuré**
-
-    Pour activer les prédictions, deux options :
-
-    **Option A — Streamlit Cloud :** ajoutez votre secret dans `.streamlit/secrets.toml` :
-    ```toml
-    GDRIVE_FILE_ID = "votre_id_google_drive"
-    ```
-    Puis partagez `model.keras` en accès public sur Google Drive.
-
-    **Option B — En local :** placez `model.keras` à la racine et relancez l'app.
-    """)
-elif os.path.exists(MODEL_PATH):
-    # Fichier déjà présent localement (ex: run local)
-    import tensorflow as tf
+if os.path.exists(MODEL_PATH):
     try:
-        model = tf.keras.models.load_model(MODEL_PATH)
+        model = load_model()
         st.success("✅ Modèle chargé !")
     except Exception as e:
-        st.error(f"❌ {e}")
+        st.error(f"❌ Erreur chargement modèle : {e}")
 else:
-    model, err = load_model(GDRIVE_FILE_ID)
-    if err:
-        st.error(f"❌ {err}")
-    else:
-        st.success("✅ Modèle chargé !")
+    st.warning("""
+    ⚠️ **Modèle introuvable** (`model.keras` absent du repo)
+
+    Dans le notebook `pokemam_10_epoch.ipynb`, sauvegardez le modèle entraîné :
+    ```python
+    model.save('model.keras')
+    ```
+    Puis committez et poussez `model.keras` dans le repo GitHub.
+    """)
 
 st.divider()
 
-# ── Upload et prédiction ──────────────────────────────────────────────────────
+# ── Upload + prédiction ──────────────────────────────────────────────────────
 col_upload, col_result = st.columns([1, 2], gap="large")
 
 with col_upload:
@@ -134,7 +106,6 @@ with col_upload:
         type=["jpg", "jpeg", "png", "webp"],
         help="Formats acceptés : JPG, PNG, WEBP",
     )
-
     if uploaded:
         img_pil = Image.open(uploaded).convert("RGB")
         st.image(img_pil, caption="Image chargée", use_container_width=True)
@@ -148,7 +119,7 @@ with col_upload:
                     predictions = model.predict(img_input)[0]
                 st.session_state["predictions"] = predictions
         else:
-            st.info("ℹ️ Configurez le modèle (voir avertissement ci-dessus) pour activer les prédictions.")
+            st.info("ℹ️ Ajoutez `model.keras` au repo pour activer les prédictions.")
 
 with col_result:
     st.markdown("### 📊 Résultat")
@@ -188,7 +159,6 @@ with col_result:
         st.markdown("### 🎯 Distribution des probabilités")
         probs_pct = [p * 100 for p in predictions]
         colors = [TYPE_COLORS.get(POKEMON_INFO[n]["types"][0], "#888") for n in POKEMON_CLASSES]
-
         fig = go.Figure(go.Bar(
             x=POKEMON_CLASSES,
             y=probs_pct,
